@@ -1,0 +1,35 @@
+extends master.pug
+block content
+
+    div.container
+            h1 bonjour
+            if errors
+                div.alert.alert-danger
+                    each error, index in errors
+                        | #{error} <br> 
+            <form method="post" action="/login">
+                <div class="form-group">
+                    <label for="exampleInputEmail1">lastname</label>
+                    <input type="text" class="text-danger" id="exampleInputEmail1" placeholder="lastname" NAME="lastname">
+                </div>
+                <div class="form-group">
+                    <label for="exampleInputEmail1">firsttname</label>
+                    <input type="text" class="text-danger" id="exampleInputEmail1" placeholder="firstname" NAME="firstname">
+                </div>
+                <div class="form-group">
+                    <label for="exampleInputEmail1">Email address</label>
+                    <input type="email" class="text-danger" id="exampleInputEmail1" placeholder="Email" NAME="email">
+                </div>
+                <div class="form-group">
+                    <label for="exampleInputPassword1">Password</label>
+                    <input type="password" class="form-control" id="exampleInputPassword1" placeholder="Password" NAME="password">
+                </div>
+                <div class="form-group">
+                    <label for="exampleInputPassword1">Passwordconfirmation</label>
+                    <input type="password" class="form-control" id="exampleInputPassword1" placeholder="Password" NAME="passConfirmation">
+                </div>
+                <button type="submit" class="btn btn-default">Submit</button>
+            </form>
+                
+
+    
