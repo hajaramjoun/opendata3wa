@@ -32,8 +32,10 @@ const UserSchema = mongoose.Schema({
         }
     },
 
-    salt: { type: String,required:true},
-    hash: { type: String,required:true }
+    salt: { type: String},
+    hash: { type: String },
+    githubid : { type: String },
+    
 
 });
 UserSchema.statics.signup = function(firstname,lastname,email,pass,pass_confirmation){
@@ -82,6 +84,19 @@ UserSchema.statics.signup = function(firstname,lastname,email,pass,pass_confirma
 })
 
 };
+UserSchema.statics.verifyPass = function(passwordInClear, userObject) {
+	const usersalt = userObject.salt;
+    const userhash = userObject.hash;
+    
+    return hash(passwordInClear, usersalt).then((data) => {
+    	if (data.hash === userhash) {
+        	return Promise.resolve(userObject)
+        } else {
+        	return Promise.reject(new Error('Mot de passe invalide!'))
+        }
+    });
+}
+
 
 // Export du ModÃ¨le mongoose reprÃ©sentant un objet User
 module.exports = mongoose.model('User', UserSchema);
