@@ -4,10 +4,30 @@ const GithubStrategy = require('passport-github').Strategy;
 
 const User = require('./models/user.model')
 
-module.exports = function (passport) {
+
+module.exports = function(passport) {
+
+    /*
+        Serialization/Désérialisation de l'objet 'user'
+        c.f. http://www.passportjs.org/docs/configure/#sessions
+    */
+
+    passport.serializeUser((user, done) => {
+        done(null, user.id);
+    });
+
+    passport.deserializeUser((id, done) => {
+        User.findById(id, (err, user) => {
+            done(err, user);
+        });
+    });
+		
+    // Stratégie Locale
+    // ----
+    
     const localStrategyConfig = {
         usernameField: 'email', // en fonction du name="" du champs input type text
-        passwordField: 'password'
+        passwordField: 'password'// en fonction du name="" du champs input type password
     };
 
     passport.use(new LocalStrategy(localStrategyConfig, (email, password, done) => {
@@ -18,12 +38,15 @@ module.exports = function (passport) {
         User.findOne({ email: email })
             .then(user => {
                 if (!user) {
+                    // Invocation du handler done() de `passport` à la manière d'une erreur --> le middleware `passport.authenticate` répondra avec une erreur
                     done(null, false, { message: 'Adresse email invalide' })
                     return Promise.reject()
                 } return user;
             }) 
             .then(user => User.verifyPass(password, user)
-                .then(user => {
+            .then(user => {
+            // Si on est arrivé jusqu'ici sans erreur, c'est que les identifiants semblent valides.
+            // ---> Fin de l'authentification, on transmet l'objet 'user' à la méthode done() de passport, et le middleware `passport.authenticate` répondra avec une nouvelle session user
                     done(null, user);
                 })
                 .catch(err => {
@@ -32,5 +55,19 @@ module.exports = function (passport) {
                 }));
 
     }));
+    // Stratégie Github
+    // ----
 
+    passport.use(new GithubStrategy({
+    	clientID : process.env.GITHUB_CLIENT_ID,
+        clientSecret : process.env.GITHUB_CLIENT_SECRET,
+        callbackURL: `http://${process.env.SERVER_NAME}:${process.env.SERVER_PORT}/auth/github/callback`
+    },
+        function(token, tokenSecret, profile, cb) {
+            console.log('PROFILE GITHUB', profile)
+            User.signupViaGithub(profile)
+                .then(user => cb(null, user))
+                .catch(err => cb(err, false));
+        }
+    ));
 }

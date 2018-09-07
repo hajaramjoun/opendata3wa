@@ -14,16 +14,16 @@ const mongoose = require('mongoose');
 const hash = require('./../hash')
 // DÃ©finition du "SchÃ©ma" d'un utilisateur
 const UserSchema = mongoose.Schema({
-	firstname : { type: String,required:true },
-	lastname : { type: String,required:true},
-    
+    firstname: { type: String, required: true },
+    lastname: { type: String, required: true },
+
     // Validateur personnalisÃ© qui vÃ©rifie le format d'une adresse e-mail.
     // BasÃ© sur la documentation de mongoose : http://mongoosejs.com/docs/validation.html#custom-validators 
-    email : {
+    email: {
         type: String,
-        required:true,
+        // required: true,
         validate: {
-            validator: function(mailValue) {
+            validator: function (mailValue) {
                 // c.f. http://emailregex.com/
                 const emailRegExp = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
                 return emailRegExp.test(mailValue);
@@ -32,13 +32,14 @@ const UserSchema = mongoose.Schema({
         }
     },
 
-    salt: { type: String},
+    salt: { type: String },
     hash: { type: String },
-    githubid : { type: String },
-    
+    githubId: { type: String },
+    avatarUrl: { type: String }
+
 
 });
-UserSchema.statics.signup = function(firstname,lastname,email,pass,pass_confirmation){
+UserSchema.statics.signup = function (firstname, lastname, email, pass, pass_confirmation) {
     const pass_errors = []
 
     if (pass.trim() === '')
@@ -49,54 +50,78 @@ UserSchema.statics.signup = function(firstname,lastname,email,pass,pass_confirma
 
     if (pass_errors.length === 0 && pass.trim() !== pass_confirmation.trim())
         pass_errors.push('Les mots de passe doivent être identiques')
-
+    if (email.trim() === '')
+        pass_errors.push('L\'adresse email doit être renseignée')
     if (pass_errors.length > 0)
         return Promise.reject(pass_errors)
-  
-        /*
-        Insertion en base, en utilisant la méthode .create() de d'un Model mongoose
-        c.f. http://mongoosejs.com/docs/api.html#create_create
 
-        Cette méthode renvoie une Promesse JS. Avec l'instruction 'return', on renvoie donc
-        la promesse comme valeur de 'UserSchema.statics.signup'
-    */
-    
+    /*
+    Insertion en base, en utilisant la méthode .create() de d'un Model mongoose
+    c.f. http://mongoosejs.com/docs/api.html#create_create
+
+    Cette méthode renvoie une Promesse JS. Avec l'instruction 'return', on renvoie donc
+    la promesse comme valeur de 'UserSchema.statics.signup'
+*/
+
     return this.findOne({ email: email })
-    .then(user => {
-        if (user)
-            return Promise.reject(new Error(`Cette adresse email est déjà utilisée (${user.email})`));
-    })
-    .then(() => hash(pass))
-    .then( ({salt, hash}) => {
-    return this.create({
-        firstname : firstname,
-        lastname : lastname,
-        email : email,
-        salt : salt,
-        hash : hash
-    })
-}).catch(err => {
-    // Fabrication d'un tableau de messages d'erreur (extraits de l'objet 'ValidationError' renvoyé par Mongoose)
-    if (err.errors)
-        throw Object.keys(err.errors).map(field => err.errors[field].message);
-    
-    throw [err.message ? err.message : err];
-})
+        .then(user => {
+            if (user)
+                return Promise.reject(new Error(`Cette adresse email est déjà utilisée (${user.email})`));
+        })
+        .then(() => hash(pass))
+        .then(({ salt, hash }) => {
+            return this.create({
+                firstname: firstname,
+                lastname: lastname,
+                email: email,
+                salt: salt,
+                hash: hash
+            })
+        }).catch(err => {
+            // Fabrication d'un tableau de messages d'erreur (extraits de l'objet 'ValidationError' renvoyé par Mongoose)
+            if (err.errors)
+                throw Object.keys(err.errors).map(field => err.errors[field].message);
+
+            throw [err.message ? err.message : err];
+        })
 
 };
-UserSchema.statics.verifyPass = function(passwordInClear, userObject) {
-	const usersalt = userObject.salt;
+UserSchema.statics.verifyPass = function (passwordInClear, userObject) {
+    const usersalt = userObject.salt;
     const userhash = userObject.hash;
-    
+
     return hash(passwordInClear, usersalt).then((data) => {
-    	if (data.hash === userhash) {
-        	return Promise.resolve(userObject)
+        if (data.hash === userhash) {
+            return Promise.resolve(userObject)
         } else {
-        	return Promise.reject(new Error('Mot de passe invalide!'))
+            return Promise.reject(new Error('Mot de passe invalide!'))
         }
     });
 }
+/*
+    Ajout d'une méthode permettant de récupérer (ou d'inscrire si inexistant) un utilisateur
+    qui s'est loggué via Github
+*/
 
+UserSchema.statics.signupViaGithub = function (profile) {
+
+    // Recherche si cet utilisateur (loggué via Github) n'est pas déjà dans notre base mongo ?
+    return this.findOne({ 'githubId': profile.id })
+        .then(user => {
+            // Non ! Donc on l'inscrit dans notre base..
+            if (user === null) {
+                const [firstname, lastname] = profile.displayName.split(' ');
+                return this.create({
+                    githubId: profile.id,
+                    firstname: firstname || '',
+                    lastname: lastname || '',
+                    avatarUrl: profile.photos[0].value // Photo par défaut de l'user Github
+                });
+            }
+            // On renvoie l'utilisateur final
+            return user;
+        });
+}
 
 // Export du ModÃ¨le mongoose reprÃ©sentant un objet User
 module.exports = mongoose.model('User', UserSchema);
